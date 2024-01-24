@@ -54,8 +54,30 @@ class CopilotChatPlugin(object):
         # Get the view option from the command
         view_option = self.nvim.eval("g:copilot_chat_view_option")
 
-        # Check if we're already in a chat buffer
-        if self.nvim.eval("getbufvar(bufnr(), '&buftype')") != "nofile":
+        def is_buffer_in_current_tab(buffer):
+            # check if the buffer is in the current tab.
+            # if so, switch to it
+            for window in self.nvim.current.tabpage.windows:
+                if window.buffer.number == buffer['bufnr']:
+                    self.nvim.current.window = window
+                    return True
+            return False
+        buffer_name = "CopilotChat"
+        existing_buffers = self.nvim.eval('getbufinfo()')
+        for buffer in existing_buffers:
+            if os.path.basename(buffer['name']) == buffer_name:
+                # If the buffer exists, switch to it
+                if is_buffer_in_current_tab(buffer):
+                    # If the buffer is already in the current tab, switch to the window
+                    break
+
+                if (buffer['bufnr'] != self.nvim.current.buffer.number
+                        and view_option == "split"):
+                    # open a split if the buffer is not the current one
+                    self.nvim.command("vnew")
+                self.nvim.command('buffer {}'.format(buffer['bufnr']))
+                break
+        else:
             # Create a new scratch buffer to hold the chat
             if view_option == "split":
                 self.nvim.command("vnew")
@@ -65,6 +87,8 @@ class CopilotChatPlugin(object):
             self.nvim.command("setlocal buftype=nofile bufhidden=hide noswapfile")
             # Set filetype as markdown and wrap with linebreaks
             self.nvim.command("setlocal filetype=markdown wrap linebreak")
+
+            self.nvim.command('file {}'.format(buffer_name))
 
         # Get the current buffer
         buf = self.nvim.current.buffer
